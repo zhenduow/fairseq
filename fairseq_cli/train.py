@@ -180,7 +180,10 @@ def train(args, trainer, task, epoch_itr):
                 and num_updates % args.save_interval_updates == 0
                 and num_updates > 0
             ):
-                valid_losses = validate(args, trainer, task, epoch_itr, valid_subsets)
+                # create a new root metrics aggregator so validation
+                # metrics don't pollute training meters
+                with metrics.aggregate(new_root=True):
+                    valid_losses = validate(args, trainer, task, epoch_itr, valid_subsets)
                 checkpoint_utils.save_checkpoint(args, trainer, epoch_itr, valid_losses[0])
 
             if num_updates >= max_update:
@@ -189,9 +192,6 @@ def train(args, trainer, task, epoch_itr):
     # log end-of-epoch stats
     stats = get_training_stats(agg.get_smoothed_values())
     progress.print(stats, tag='train', step=num_updates)
-
-    # reset epoch-level meters
-    metrics.reset_meters('train')
 
 
 def get_training_stats(stats):
@@ -231,9 +231,6 @@ def validate(args, trainer, task, epoch_itr, subsets):
             prefix='valid on \'{}\' subset'.format(subset),
             no_progress_bar='simple'
         )
-
-        # reset validation meters
-        metrics.reset_meters('valid')
 
         with metrics.aggregate() as agg:
             for sample in progress:
