@@ -105,7 +105,8 @@ class BARTHubInterface(nn.Module):
     def sample(self, sentences: List[str], beam: int = 1, verbose: bool = False, **kwargs) -> str:
         input = [self.encode(sentence) for sentence in sentences]
         hypos = self.generate(input, beam, verbose, **kwargs)
-        return [self.decode(x['tokens']) for x in hypos]
+        #return [self.decode(x['tokens']) for x in hypos]
+        return [self.decode(x['tokens']) for x in hypos], [x['score'] for x in hypos]
 
     def generate(self, tokens: List[torch.LongTensor], beam: int = 5, verbose: bool = False, **kwargs) -> torch.LongTensor:
         sample = self._build_sample(tokens)
