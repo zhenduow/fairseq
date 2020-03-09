@@ -112,6 +112,8 @@ class SequenceGenerator(object):
 
         src_tokens = encoder_input['src_tokens']
         src_lengths = (src_tokens.ne(self.eos) & src_tokens.ne(self.pad)).long().sum(dim=1)
+        tgt_tokens = sample['target']
+        tgt_lengths = (tgt_tokens.ne(self.eos) & tgt_tokens.ne(self.pad)).long().sum(dim=1)
         input_size = src_tokens.size()
         # batch dimension goes first followed by source lengths
         bsz = input_size[0]
@@ -135,11 +137,18 @@ class SequenceGenerator(object):
         encoder_outs = model.reorder_encoder_out(encoder_outs, new_order)
 
         # initialize buffers
+        #scores = src_tokens.new(bsz * beam_size, max_len + 1).float().fill_(0)
+        #scores_buf = scores.clone()
+        #tokens = src_tokens.new(bsz * beam_size, max_len + 2).long().fill_(self.pad)
+        #tokens_buf = tokens.clone()
+        #tokens[:, 0] = self.eos if bos_token is None else bos_token
+        tokens = tgt_tokens.new(bsz * beam_size, max_len + 2).long().fill_(self.pad)
+        tokens[:,1:tgt_lengths[0]+2] = tgt_tokens[:,:]
+        tokens[:, 0] = self.eos if bos_token is None else bos_token
+        tokens_buf = tokens.clone()
         scores = src_tokens.new(bsz * beam_size, max_len + 1).float().fill_(0)
         scores_buf = scores.clone()
-        tokens = src_tokens.new(bsz * beam_size, max_len + 2).long().fill_(self.pad)
-        tokens_buf = tokens.clone()
-        tokens[:, 0] = self.eos if bos_token is None else bos_token
+        cumulative_log_prob = 0
         attn, attn_buf = None, None
 
         # The blacklist indicates candidates that should be ignored.
@@ -261,7 +270,8 @@ class SequenceGenerator(object):
 
         reorder_state = None
         batch_idxs = None
-        for step in range(max_len + 1):  # one extra step for EOS marker
+        #for step in range(max_len + 1):  # one extra step for EOS marker
+        for step in range(tgt_lengths[0] + 1):  # one extra step for EOS marker
             # reorder decoder internal states based on the prev choice of beams
             if reorder_state is not None:
                 if batch_idxs is not None:
@@ -275,6 +285,11 @@ class SequenceGenerator(object):
                 tokens[:, :step + 1], encoder_outs, temperature=self.temperature,
             )
 
+            cumulative_log_prob += lprobs[0,tokens[0,step+1]]
+
+            print('step',step)
+            print('reference', tokens[0,:step+1])
+            print('next token', tokens[0,step+1], 'prob', lprobs[0,tokens[0,step+1]])
             lprobs[:, self.pad] = -math.inf  # never select pad
             lprobs[:, self.unk] -= self.unk_penalty  # apply unk penalty
 
@@ -485,7 +500,7 @@ class SequenceGenerator(object):
                 )
 
             # swap buffers
-            tokens, tokens_buf = tokens_buf, tokens
+            #tokens, tokens_buf = tokens_buf, tokens
             scores, scores_buf = scores_buf, scores
             if attn is not None:
                 attn, attn_buf = attn_buf, attn
@@ -496,7 +511,7 @@ class SequenceGenerator(object):
         # sort by score descending
         for sent in range(len(finalized)):
             finalized[sent] = sorted(finalized[sent], key=lambda r: r['score'], reverse=True)
-        return finalized
+        return cumulative_log_prob/tgt_lengths[0]
 
 
 class EnsembleModel(torch.nn.Module):

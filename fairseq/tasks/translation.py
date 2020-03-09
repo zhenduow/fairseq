@@ -245,6 +245,9 @@ class TranslationTask(FairseqTask):
 
     def build_dataset_for_inference(self, src_tokens, src_lengths):
         return LanguagePairDataset(src_tokens, src_lengths, self.source_dictionary)
+        
+    def build_dataset_for_evaluation(self, src_tokens, src_lengths, tgt_tokens, tgt_lengths):
+        return LanguagePairDataset(src_tokens, src_lengths, self.source_dictionary, tgt_tokens, tgt_lengths)
 
     def build_model(self, args):
         if getattr(args, 'eval_bleu', False):

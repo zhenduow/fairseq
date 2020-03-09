@@ -102,14 +102,39 @@ class BARTHubInterface(nn.Module):
         )
         return sample
 
+    def _build_sample_for_evaluation(self, src_tokens: List[torch.LongTensor], tgt_tokens: List[torch.LongTensor]):
+        # assert torch.is_tensor(src_tokens)
+        dataset = self.task.build_dataset_for_evaluation(
+            src_tokens,
+            [x.numel() for x in src_tokens],
+            tgt_tokens,
+            [x.numel() for x in tgt_tokens],
+        )
+        sample = dataset.collater(dataset)
+        sample = utils.apply_to_sample(
+            lambda tensor: tensor.to(self.device),
+            sample
+        )
+        return sample
+
     def sample(self, sentences: List[str], beam: int = 1, verbose: bool = False, **kwargs) -> str:
         input = [self.encode(sentence) for sentence in sentences]
         hypos = self.generate(input, beam, verbose, **kwargs)
         #return [self.decode(x['tokens']) for x in hypos]
         return [self.decode(x['tokens']) for x in hypos], [x['score'] for x in hypos]
+    
+    def sample_for_evaluation(self, sentences: List[str], target: List[str], beam: int = 1, verbose: bool = False, **kwargs) -> str:
+        input = [self.encode(sentence) for sentence in sentences]
+        output = [self.encode(sentence) for sentence in target]
+        avg_score = self.generate_and_evaluate(input, output, beam, verbose, **kwargs)
+        #return [self.decode(x['tokens']) for x in hypos]
+        return avg_score
 
     def generate(self, tokens: List[torch.LongTensor], beam: int = 5, verbose: bool = False, **kwargs) -> torch.LongTensor:
-        sample = self._build_sample(tokens)
+        sample = self._build_sample_(tokens)
+
+    def generate_and_evaluate(self, tokens: List[torch.LongTensor], tgt_tokens: List[torch.LongTensor], beam: int = 5, verbose: bool = False, **kwargs) -> torch.LongTensor:
+        sample = self._build_sample_for_evaluation(tokens, tgt_tokens)
 
         # build generator using current args as well as any kwargs
         gen_args = copy.copy(self.args)
@@ -117,7 +142,8 @@ class BARTHubInterface(nn.Module):
         for k, v in kwargs.items():
             setattr(gen_args, k, v)
         generator = self.task.build_generator(gen_args)
-        translations = self.task.inference_step(
+        #translations = self.task.inference_step(
+        avg_log_prob = self.task.inference_step(
             generator,
             [self.model],
             sample,
@@ -132,9 +158,9 @@ class BARTHubInterface(nn.Module):
             return getattr(gen_args, name, getattr(self.args, name, default))
 
         # Process top predictions
-        hypos = [x[0] for x in translations]
-        hypos = [v for _, v in sorted(zip(sample['id'].tolist(), hypos))]
-        return hypos
+        #hypos = [x[0] for x in translations]
+        #hypos = [v for _, v in sorted(zip(sample['id'].tolist(), hypos))]
+        return avg_log_prob
 
     def extract_features(self, tokens: torch.LongTensor, return_all_hiddens: bool = False) -> torch.Tensor:
         if tokens.dim() == 1:

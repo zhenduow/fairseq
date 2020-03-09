@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -A zhenduow
-#SBATCH -n 4
+#SBATCH -n 1
 
 #SBATCH --output=job.%J.out
 #SBATCH --partition=titan-giant
