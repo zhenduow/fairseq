@@ -119,7 +119,7 @@ class SequenceGenerator(object):
         bsz = input_size[0]
         src_len = input_size[1]
         beam_size = self.beam_size
-
+        
         if self.match_source_len:
             max_len = src_lengths.max().item()
         else:
@@ -128,6 +128,7 @@ class SequenceGenerator(object):
                 # exclude the EOS marker
                 model.max_decoder_positions() - 1,
             )
+            max_len = int(self.max_len_a * src_len + self.max_len_b)
         assert self.min_len <= max_len, 'min_len cannot be larger than max_len, please adjust these!'
 
         # compute the encoder output for each beam
@@ -287,9 +288,6 @@ class SequenceGenerator(object):
 
             cumulative_log_prob += lprobs[0,tokens[0,step+1]]
 
-            print('step',step)
-            print('reference', tokens[0,:step+1])
-            print('next token', tokens[0,step+1], 'prob', lprobs[0,tokens[0,step+1]])
             lprobs[:, self.pad] = -math.inf  # never select pad
             lprobs[:, self.unk] -= self.unk_penalty  # apply unk penalty
 
