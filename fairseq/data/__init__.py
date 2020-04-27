@@ -3,6 +3,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import fairseq.data.bert_dictionary
+import fairseq.data.masked_dataset
+import fairseq.modules.learned_positional_embedding
+
 from .dictionary import Dictionary, TruncatedDictionary
 
 from .fairseq_dataset import FairseqDataset, FairseqIterableDataset
