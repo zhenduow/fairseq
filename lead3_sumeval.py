@@ -12,7 +12,7 @@ bart.eval()
 bart.half()
 count = 1
 bsz = 1
-with open('cnn_dm/test.source') as source, open('cnn_dm/test_lead3.target.') as target, open('cnn_dm/test_lead3.hypo', 'w') as fout:
+with open('cnn_dm/test.source') as source, open('cnn_dm/test_lead3.target') as target, open('cnn_dm/test_lead3.hypo', 'w') as fout:
     source = source.readlines()
     target = target.readlines()
     for sample_id in range(len(source)):
